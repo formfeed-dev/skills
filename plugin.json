@@ -1,0 +1,49 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "formfeed",
+  "version": "0.3.20",
+  "description": "Write and check Formfeed templates and the code that renders them, and render PDFs and images from your templates, from your coding agent. Signs in with your Formfeed account.",
+  "author": {
+    "name": "Formfeed",
+    "email": "support@formfeed.dev"
+  },
+  "homepage": "https://formfeed.dev/?utm_source=agent-plugins",
+  "repository": "https://github.com/formfeed-dev/skills",
+  "license": "MIT",
+  "keywords": [
+    "pdf",
+    "pdf-generation",
+    "image-generation",
+    "templates",
+    "documents",
+    "invoices",
+    "e-invoicing",
+    "mcp"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Formfeed",
+        "shortDescription": "Templates, PDFs and images",
+        "longDescription": "Write and check Formfeed templates and the code that renders them, and render PDFs and images from your templates, from your coding agent. Signs in with your Formfeed account. Two skills write, check and render templates with the formfeed command line and write the code that renders them through the API; the hosted MCP server lists your templates, checks data and renders.",
+        "developerName": "Formfeed",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://formfeed.dev/?utm_source=codex",
+        "privacyPolicyURL": "https://formfeed.dev/legal/privacy?utm_source=codex",
+        "termsOfServiceURL": "https://formfeed.dev/legal/terms?utm_source=codex",
+        "defaultPrompt": [
+          "Write an invoice template for this project and check it with formfeed validate",
+          "Render a PDF from my invoice template with this data",
+          "Add code that renders our order confirmation through the Formfeed API"
+        ],
+        "brandColor": "#4F46E5",
+        "composerIcon": "./icon.png",
+        "logo": "./icon.png"
+      }
+    }
+  }
+}

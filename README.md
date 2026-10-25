@@ -1,7 +1,9 @@
 # Formfeed for coding agents
 
-Connects Claude Code and Cursor to [Formfeed](https://formfeed.dev/?utm_source=github-skills), the
-API that renders PDFs and images from HTML, Word and PowerPoint templates. The plugin has two parts:
+Connects your coding agent to [Formfeed](https://formfeed.dev/?utm_source=github-skills), the API
+that renders PDFs and images from HTML, Word and PowerPoint templates: Claude Code, Cursor, Codex,
+GitHub Copilot, the Gemini CLI, Antigravity, and any agent that reads Agent Skills. The plugin has
+two parts:
 
 - **Two skills** that teach your agent how Formfeed works: `formfeed-templates` writes, checks,
   previews and renders templates as files with the `formfeed` command line, and `formfeed-api`
@@ -33,6 +35,37 @@ one repository:
 }
 ```
 
+**Codex:**
+
+```bash
+codex plugin marketplace add formfeed-dev/skills
+codex plugin add formfeed@formfeed-dev
+```
+
+Or add the marketplace and install Formfeed from `/plugins` in a Codex session.
+
+**GitHub Copilot CLI:**
+
+```bash
+copilot plugin marketplace add formfeed-dev/skills
+copilot plugin install formfeed@formfeed-dev
+```
+
+**VS Code:** run **Chat: Install Plugin From Source** from the Command Palette and enter
+`https://github.com/formfeed-dev/skills`.
+
+**Gemini CLI:**
+
+```bash
+gemini extensions install https://github.com/formfeed-dev/skills
+```
+
+**Antigravity:**
+
+```bash
+agy plugin install https://github.com/formfeed-dev/skills
+```
+
 **The skills alone, in any agent that reads Agent Skills:**
 
 ```bash
@@ -42,7 +75,8 @@ npx skills add formfeed-dev/skills
 ## Signing in
 
 The first time the agent connects to the server, Formfeed's sign-in opens in your browser (in
-Claude Code: run `/mcp` and choose the Formfeed server). Sign in, choose the workspace the agent
+Claude Code, run `/mcp` and choose the Formfeed server; in the Gemini CLI, `/mcp auth formfeed`;
+in Antigravity, **Authenticate** beside the server in the agent's settings). Sign in, choose the workspace the agent
 works in, and allow it. The agent keeps a token and refreshes it itself. Every agent you allowed is
 listed in the app under **Account → Connected agents**, where you change its workspace or revoke it.
 
