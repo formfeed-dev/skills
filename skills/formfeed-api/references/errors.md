@@ -219,6 +219,26 @@ The [e-invoice options](https://docs.formfeed.dev/templates/e-invoices#options) 
 
 No. Retrying the same request gives the same answer; change the options first. Send the corrected request with a new `Idempotency-Key` or without one: a `4xx` answer is stored under its key for 24 hours, so the old key returns this problem again. See [retrying](https://docs.formfeed.dev/api/errors#retries).
 
+## 500 einvoice_validator_error
+
+Every [e-invoice](https://docs.formfeed.dev/templates/e-invoices) is validated before it is delivered. Here the rules of the validator stopped before they finished, so they say nothing about the invoice either way, and Formfeed does not deliver a file that was not checked. The render is `failed`; no file is stored, no plain PDF is delivered instead, and a failed render costs nothing.
+
+Nothing in your `_invoice` block is shown to be wrong. The validator failed, not the invoice, and that is ours to fix.
+
+The problem carries `einvoice`, the report of the validator. Its `validation.messages` hold one error without a `rule`, which says that the invoice could not be validated. The failed render keeps the same report, with `xml_sha256`, the hash of the XML that was checked.
+
+**Causes.**
+
+- An expression of the rule set failed on the XML instead of reporting a finding. The rule set is the one the open-source validator Mustang carries; `einvoice.validation.versions` names its release.
+
+**Fix.**
+
+- Send the `render_id` to support@formfeed.dev. We see where the rules stopped, and fix it or report it to the makers of the validator.
+
+**Retry.**
+
+No. The same invoice stops the same rules. Async renders are not retried for this code either.
+
 ## 413 file_too_large
 
 The uploaded file is larger than the limit for where it goes. `bytes` is the size of the file, `limit` the limit that applied, both in bytes. Nothing was stored or charged.
@@ -750,13 +770,13 @@ The render service of the region could not take the request. Formfeed renders in
 **Causes.**
 
 - The render service of the region is busy or restarting (`detail`: _The render region is busy, retry shortly_; `Retry-After` comes from the service, usually 2). The PDF tools, conversions and checks such as `validate_data` try once more and then answer with this code. A synchronous render does not: it waits up to 30 seconds for a free render slot and then goes to the queue, answering `202` with the header `X-Render-Async-Fallback: true` ([the automatic fallback](https://docs.formfeed.dev/api/async-and-batch#the-automatic-fallback)).
-- A `region` for which the gateway has no render service configured (`detail`: _Region us is not available_, `Retry-After: 60`). Only `eu` is in service: leave `region` out rather than relying on this answer, because a region the gateway does have an address for but that does not render may fail differently.
+- A workspace whose region has no render service (`detail`: _Region us is not available_, `Retry-After: 60`). The answer comes before anything is recorded, for synchronous and asynchronous renders and batches alike. Only `eu` is in service. A request that names a region other than its workspace's answers `400 invalid_request` instead.
 
 **Fix.**
 
 - For a busy region, retry after the seconds in `Retry-After`, with the same `Idempotency-Key`. The SDKs do this for you.
 - Send large numbers of documents as [async renders or a batch](https://docs.formfeed.dev/api/async-and-batch): the queue waits for free slots instead of answering this code.
-- Leave `region` out, or send `"region": "eu"`.
+- Leave `region` out: a render runs in its workspace's region.
 
 **Retry.**
 
