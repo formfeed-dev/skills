@@ -94,13 +94,13 @@ No. The same request gets the same answer. Change it as above, then send it agai
 
 ## 503 conformance_unavailable
 
-The service that turns a rendered PDF into an [e-invoice](https://docs.formfeed.dev/templates/e-invoices) and validates it, and that validates a file rendered with [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf), is busy or not reachable right now. Where a second attempt could help, Formfeed has already made it. A render that asked for an e-invoice never comes back as a plain PDF instead, and one that asked for PDF/UA-1 never comes back unchecked: you get the validated file or this problem. The answer carries `Retry-After` (5 seconds). Nothing was charged.
+The service that turns a rendered PDF into an [e-invoice](https://docs.formfeed.dev/templates/e-invoices) or a [PDF/A](https://docs.formfeed.dev/templates/pdf-a) and validates it, and that validates a file rendered with [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf), is busy or not reachable right now. Where a second attempt could help, Formfeed has already made it. A render that asked for an e-invoice or for PDF/A never comes back as a plain PDF instead, and one that asked for PDF/UA-1 never comes back unchecked: you get the validated file or this problem. The answer carries `Retry-After` (5 seconds). Nothing was charged.
 
 **Causes.**
 
-- Many e-invoices or PDF/UA files at the same time in your region. Each file is converted or validated on its own, so bursts queue up (_The conformance service is busy; retry shortly_).
+- Many e-invoices, PDF/A or PDF/UA files at the same time in your region. Each file is converted or validated on its own, so bursts queue up (_The conformance service is busy; retry shortly_).
 - The service restarting after an update (_The conformance service is not reachable; retry shortly_).
-- A region in which e-invoices or the PDF/UA check are not available (_E-invoices are not available in this region_, _PDF/UA validation is not available in this region_).
+- A region in which e-invoices or the PDF/UA check are not available (_E-invoices are not available in this region_, _PDF/A is not available in this region_, _PDF/UA validation is not available in this region_).
 
 A conversion or validation that takes longer than its 20 seconds answers [`render_timeout`](https://docs.formfeed.dev/errors/render-timeout) instead.
 
@@ -359,6 +359,7 @@ The request could not be accepted as it is: the body is not JSON, a field has th
 - `post` (merge, watermark, password) on an output other than PDF, a watermark with both `text` and `image` or neither, or `merge_after` sources stored in another region than the render.
 - An [e-invoice](https://docs.formfeed.dev/templates/e-invoices) asked for on an image, or together with a password (`field: "post.password"`): PDF/A forbids encryption.
 - [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf) with a value other than `true`, `false` or `{ "check": "strict" | "report" }`, on an image, on a Word or PowerPoint template, or together with `post.merge_after`.
+- [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a) with a value other than `"2b"`, `"3b"`, `true`, `false` or `null`, on an image, together with `post.password`, or as `"2b"` beside an e-invoice.
 - A query parameter out of range, such as `limit=500` on `GET /v1/renders` (1 to 100).
 - A template whose [shared partials](https://docs.formfeed.dev/templates/shared-partials) add up to more than 2 MB in one render (`partials`, `bytes`, `limit`).
 - A shared partial name that is not 1 to 64 lowercase letters, digits, dashes and underscores starting and ending with a letter or digit, or a new shared partial when the organisation already holds 200 (`feature: "partials"`).
@@ -606,7 +607,7 @@ No output can be larger than 250 MB, whatever the plan.
 - Large images embedded at full resolution, especially as data URIs.
 - A template that produces more than 20 MB of HTML, usually a very long table.
 - A merge or `post.merge_after` whose documents add up to more than the limit.
-- An e-invoice or a PDF/UA-1 file too large for the validator (_The PDF is too large to be made an e-invoice_).
+- An e-invoice, a PDF/A or a PDF/UA-1 file too large for the validator (_The PDF is too large to be made an e-invoice_, _The PDF is too large to be made a PDF/A-2b_).
 
 A Word or PowerPoint template that grows too large while it is filled answers [`office_document_too_large`](https://docs.formfeed.dev/errors/office-document-too-large) instead, and `html` sent in a request is limited to 5 MB before anything is rendered ([`invalid_request`](https://docs.formfeed.dev/errors/invalid-request)).
 
@@ -652,23 +653,31 @@ No. The same request gets the same answer. Change the data, the template or the 
 
 ## 500 pdfa_conversion_failed
 
-An [e-invoice](https://docs.formfeed.dev/templates/e-invoices) is a PDF/A-3b that carries the invoice as XML. The rendered PDF could not be made one, or the converted file did not pass the PDF/A check. The render is `failed`; no file is stored, no plain PDF is delivered instead, and a failed render costs nothing.
+The rendered PDF could not be made a valid PDF/A, or the converted file did not pass the PDF/A check. It is the error of two kinds of render:
 
-The problem carries one of two things:
+- a render with [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a), which asked for a PDF/A-2b or PDF/A-3b;
+- an [e-invoice](https://docs.formfeed.dev/templates/e-invoices), which is a PDF/A-3b that carries the invoice as XML.
 
-- `einvoice`, the report of the validator, when the converted file was checked and refused. Its `validation.messages` with `"part": "pdf"` name the clause of PDF/A (`rule`) and the object of the PDF (`location`). The failed render keeps the same report.
+The render is `failed`; no file is stored, no ordinary PDF is delivered instead, and a failed render costs nothing.
+
+The problem carries one of these:
+
+- `pdfa`, the report of the validator, for a render with `pdf.pdfa`. Its `messages` name the clause of PDF/A (`rule`) and the object of the PDF (`location`). An e-invoice that set `pdf.pdfa` carries it beside `einvoice`. The failed render keeps the same report.
+- `einvoice`, the report of the validator, for an e-invoice whose converted file was checked and refused. Its `validation.messages` with `"part": "pdf"` name the clause of PDF/A and the object of the PDF.
 - `reason`, the first line of what the converter said, when the PDF could not be converted at all.
 
 **Causes.**
 
 - A font that is not embedded (`6.2.11.4.1-1`). PDF/A needs every font inside the file. A PDF of the file library that is appended with `post.merge_after` can bring such a font.
 - A font whose embedded program disagrees with the widths the PDF states (`6.2.11.5-1`). The office converter writes such a font for OpenType fonts with CFF outlines, which on our side is the font for Chinese, Japanese and Korean text in a Word or PowerPoint template.
+- With `"pdfa": "2b"`: a file attached to the document that is not itself PDF/A (`6.8-5`). PDF/A-2 takes no other attachment; PDF/A-3 takes any.
 - A failure of the converter itself, reported in `reason`.
 
 **Fix.**
 
-- Read `einvoice.validation.messages` to see which clause of PDF/A the file breaks, and where.
-- For a font that is not embedded in an appended PDF: create that PDF again with its fonts embedded, or leave it out of the e-invoice.
+- Read `pdfa.messages`, or `einvoice.validation.messages` for an e-invoice, to see which clause of PDF/A the file breaks, and where. [What fails and why](https://docs.formfeed.dev/templates/pdf-a#what-fails-and-why) explains each rule.
+- For a font that is not embedded in an appended PDF: create that PDF again with its fonts embedded, or leave it out of the PDF/A.
+- For an attachment at `"2b"`: ask for `"3b"`.
 - For anything else, send the `render_id` to support@formfeed.dev. A document that Formfeed rendered and cannot convert is ours to fix.
 
 **Retry.**
@@ -681,7 +690,7 @@ The render set [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf) wi
 
 `accessibility.failures` lists each rule that failed: its number in the validator's rule set, what to change in the template, and the start tags of the elements it is about. The render is `failed` and keeps the same block, so [`GET /renders/{id}`](https://docs.formfeed.dev/api/rendering) and the render log show it later. No file is stored, and a failed render costs nothing.
 
-Where the render was also an [e-invoice](https://docs.formfeed.dev/templates/accessible-pdf#e-invoice), the problem carries `einvoice` beside `accessibility`: the invoice itself was valid, and the file it was converted to is the one that failed PDF/UA-1. No e-invoice is delivered either.
+Where the render was also an [e-invoice](https://docs.formfeed.dev/templates/accessible-pdf#e-invoice), the problem carries `einvoice` beside `accessibility`: the invoice itself was valid, and the file it was converted to is the one that failed PDF/UA-1. No e-invoice is delivered either. Where the render set [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a#pdf-ua), the problem carries `pdfa` the same way: the file was a valid PDF/A and failed PDF/UA-1, so nothing is delivered.
 
 **Causes.**
 
@@ -806,16 +815,16 @@ No. A request that was not kept does not come back.
 
 A step of the render took longer than its limit. There is no limit on the render as a whole; each step has its own:
 
-| Step                                                                                                                                             | Limit                                                 | `detail`                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| The template language (Jinja2, Handlebars) fills the template with the data                                                                      | 5 seconds                                             | _Template render took 6120 ms; the limit is 5000 ms_                                              |
-| Chromium loads the document, until none of its requests is running ([`waitFor.networkIdle`](https://docs.formfeed.dev/templates/settings#waiting-for-content) says how) | 30 seconds                                            | _Render exceeded 30000 ms_                                                                        |
-| Waiting until an element matching [`waitFor.selector`](https://docs.formfeed.dev/templates/settings#waiting-for-content) is visible                                     | `waitFor.timeoutMs`, 5 seconds by default, at most 30 | _Render exceeded 30000 ms_ (the message names 30 seconds in any case)                             |
-| Taking the picture of an image output, or of the element of `image.clipSelector`                                                                 | 30 seconds                                            | _Render exceeded 30000 ms_                                                                        |
-| Printing the PDF                                                                                                                                 | 120 seconds                                           | _Printing the PDF exceeded 120000 ms_                                                             |
-| Filling a Word or PowerPoint template                                                                                                            | 10 seconds                                            | _Template render took … ms; the limit is 10000 ms_                                                |
-| Converting a Word or PowerPoint template, or a document sent to `/pdf/convert`, to PDF                                                           | 60 seconds for the whole render or conversion         | _The conversion did not finish in time_                                                           |
-| Making an [e-invoice](https://docs.formfeed.dev/templates/e-invoices), or validating a [PDF/UA-1 file](https://docs.formfeed.dev/templates/accessible-pdf)                                     | 20 seconds                                            | _The e-invoice conversion did not finish in time_, _The PDF/UA validation did not finish in time_ |
+| Step                                                                                                                                             | Limit                                                 | `detail`                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The template language (Jinja2, Handlebars) fills the template with the data                                                                      | 5 seconds                                             | _Template render took 6120 ms; the limit is 5000 ms_                                                                                             |
+| Chromium loads the document, until none of its requests is running ([`waitFor.networkIdle`](https://docs.formfeed.dev/templates/settings#waiting-for-content) says how) | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
+| Waiting until an element matching [`waitFor.selector`](https://docs.formfeed.dev/templates/settings#waiting-for-content) is visible                                     | `waitFor.timeoutMs`, 5 seconds by default, at most 30 | _Render exceeded 30000 ms_ (the message names 30 seconds in any case)                                                                            |
+| Taking the picture of an image output, or of the element of `image.clipSelector`                                                                 | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
+| Printing the PDF                                                                                                                                 | 120 seconds                                           | _Printing the PDF exceeded 120000 ms_                                                                                                            |
+| Filling a Word or PowerPoint template                                                                                                            | 10 seconds                                            | _Template render took … ms; the limit is 10000 ms_                                                                                               |
+| Converting a Word or PowerPoint template, or a document sent to `/pdf/convert`, to PDF                                                           | 60 seconds for the whole render or conversion         | _The conversion did not finish in time_                                                                                                          |
+| Making an [e-invoice](https://docs.formfeed.dev/templates/e-invoices) or a [PDF/A](https://docs.formfeed.dev/templates/pdf-a), or validating a [PDF/UA-1 file](https://docs.formfeed.dev/templates/accessible-pdf)    | 20 seconds                                            | _The e-invoice conversion did not finish in time_, _The PDF/A conversion did not finish in time_, _The PDF/UA validation did not finish in time_ |
 
 A document of several hundred pages prints in tens of seconds, well inside its limit. A `waitFor.delayMs` pause has no limit of its own and is capped at 10 seconds. A Liquid template that runs longer than 5 seconds answers [`template_runtime_error`](https://docs.formfeed.dev/errors/template-runtime) instead, and a `url` render whose page does not load in 30 seconds answers [`navigation_failed`](https://docs.formfeed.dev/errors/navigation-failed).
 
@@ -894,6 +903,7 @@ A source exists, but it cannot be processed: the render has not succeeded, the f
 - The source render failed, or is still `queued` or `rendering`.
 - The source render produced an image, not a PDF (_Render … produced png, not a PDF_), or a library file is not a PDF.
 - A watermark `image` that is not a PNG or JPEG, or cannot be read.
+- A PDF/A source for `/pdf/watermark` or `/pdf/protect`: an e-invoice, or a render with [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a#pdf-tools). Both tools would change a file that was checked as it is, and PDF/A forbids encryption. Set a watermark on the render (`post.watermark`) instead.
 - A PDF that cannot be read, for example a damaged file in the library (_terms.pdf is not a readable PDF_).
 - `/pdf/convert` with a render whose output is not a Word or PowerPoint document; PDFs and images need no conversion.
 - An office document that LibreOffice refuses to read (_The document cannot be converted_, with the converter's `reason`).

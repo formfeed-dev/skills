@@ -11,7 +11,8 @@ two parts:
   HTTP. They tell the agent what it would otherwise guess: the folder of a template, how each
   template language calls a helper, which command checks what, and what costs units.
 - **Formfeed's hosted MCP server**, so your agent can list your templates, read the data each one
-  expects, check data, render documents and convert Office files, signed in with your account.
+  expects, check data, render documents and convert Office files, signed in with your account, and,
+  if you allow it, save templates as drafts that you publish.
 
 ## Install
 
@@ -90,9 +91,12 @@ No Formfeed account yet? The free plan has 100 units a month and needs no credit
 ## What the agent can do, and what it costs
 
 A signed-in agent reads your templates and the schema of their data, checks data, renders documents
-and converts Office files, in the workspace you chose. Through the server it cannot publish or
-change templates, delete documents, or manage webhooks, keys, members or billing, whatever your
-role.
+and converts Office files, in the workspace you chose. It saves a new template or a change to one
+only as a draft, and only if you allowed it for that agent (on the consent page, or later under
+**Account → Connected agents**) and your role may edit templates: renders keep using the published
+version until someone in your team publishes the draft in Formfeed. Through the server it cannot
+publish or archive templates, delete documents, or manage webhooks, keys, members or billing,
+whatever your role.
 
 The skills keep the agent to checks that cost nothing (`formfeed validate`, `formfeed test`, the
 local preview) until a template is right, and then render once. A render with a live key counts
@@ -107,8 +111,8 @@ Free plan. The skills tell the agent to run a command that changes your workspac
   (`npx formfeed`), in your project: it checks and previews templates on your machine, and calls
   Formfeed's API for the commands that render, pull or push.
 - **Sends:** your agent connects to `https://mcp.formfeed.dev/mcp`, Formfeed's hosted MCP server,
-  and sends it what the agent passes to a tool: template names, data, HTML, and documents to
-  convert. The server passes each call on to Formfeed's API with the token of your sign-in and
+  and sends it what the agent passes to a tool: template names, data, HTML, the templates it saves
+  as drafts, and documents to convert. The server passes each call on to Formfeed's API with the token of your sign-in and
   stores nothing itself. The command line sends your templates and their data to Formfeed's API,
   `https://api-eu.formfeed.dev`, when it renders, pulls or pushes, with the key you signed in with.
 - **Fetches:** the answers of the API: your templates and their schemas, the results of a check,

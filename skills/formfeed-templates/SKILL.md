@@ -1,6 +1,6 @@
 ---
 name: formfeed-templates
-description: Write, change, check, preview and render Formfeed document templates as files. Use when a project has a formfeed.json, when someone asks for a PDF, image, Word or PowerPoint template for Formfeed (invoices, offers, certificates, reports, labels, social images), when a template written in Jinja2, Liquid or Handlebars should print correctly as a PDF, or when templates should be moved to Formfeed from another provider.
+description: Write, change, check, preview and render Formfeed document templates as files, or save drafts of a workspace's stored templates through the Formfeed MCP tools. Use when a project has a formfeed.json, when someone asks for a PDF, image, Word or PowerPoint template for Formfeed (invoices, offers, certificates, reports, labels, social images), when a template written in Jinja2, Liquid or Handlebars should print correctly as a PDF, or when templates should be moved to Formfeed from another provider.
 license: MIT
 ---
 
@@ -96,10 +96,38 @@ Its document is edited in Word or PowerPoint, not here: work on its data sets, `
 
 `formfeed templates list` names the workspace's templates, `formfeed templates pull invoice` writes
 one with its schema and sample data into the project, and `formfeed render invoice --remote`
-renders its published version. When this session has the Formfeed MCP tools (`list_templates`,
-`get_template_schema`, `validate_template`, `render`), use those instead: they need no project.
+renders its published version. When this session has the Formfeed MCP tools, use those instead
+(section 9): they need no project.
 
-## 9. Templates from another provider
+## 9. Stored templates through the Formfeed MCP tools
+
+When this session has the Formfeed MCP tools, they work on the workspace's stored templates:
+
+- **A document:** `list_templates` finds the slug, `get_template_schema` gives the shape of the
+  data, `validate_template` checks the data for free, and `render` makes the document from the
+  published version.
+- **A change or a new template:** read the template with `get_template_source`, change only what
+  the person asked for, and save it with `save_template`, passing the `checksum` you read as
+  `base_checksum` (required for a template that exists) and a `change_note` that says what changed.
+  Pass only the parts you changed; the tool keeps the others from the version you read. A new
+  template is `new_template` together with `html`. When the save reports a conflict, someone saved
+  a newer version since you read it: read it again and make the change on that version.
+- **Always a draft:** `save_template` never publishes. Renders, `render` included, keep using the
+  published version until a person publishes the draft in Formfeed. Fix every error the save's
+  check reports and save again (`validate_template` with `version` checks a saved draft once more),
+  then hand the person the `review_url`, the page where they review and publish it. Never say that
+  the change is live.
+- **Only with permission:** an API key needs the `template:write` scope. A signed-in agent saves
+  drafts only when the person allowed it for this agent (on the consent page, or later under
+  Account → Connected agents) and their role may edit templates. Otherwise the tool answers
+  `403 forbidden` with the reason: tell the person, and try no other way around it.
+- **Not Word or PowerPoint:** their document is changed in Word or PowerPoint and uploaded in
+  Formfeed; the tools do not save it.
+- Save only when the conversation asked for a change. A draft changes no document, but the team
+  sees it in the version history, and a new template counts towards the plan's template limit.
+  More: [template drafts](https://docs.formfeed.dev/integrations/mcp#drafts).
+
+## 10. Templates from another provider
 
 `formfeed import` turns templates of another provider into local folders, which you then check
 like any other: [references/import.md](references/import.md).
