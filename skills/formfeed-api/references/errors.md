@@ -653,36 +653,60 @@ No. The same request gets the same answer. Change the data, the template or the 
 
 ## 500 pdfa_conversion_failed
 
-The rendered PDF could not be made a valid PDF/A, or the converted file did not pass the PDF/A check. It is the error of two kinds of render:
+The converter could not read or write the PDF, or the validator could not judge the converted file, so there is no verdict on the document. The failure is on our side. A file the validator judged and found to break rules of PDF/A answers [`pdfa_validation_failed`](https://docs.formfeed.dev/errors/pdfa-validation-failed) instead.
+
+It can happen to a render with [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a) and to an [e-invoice](https://docs.formfeed.dev/templates/e-invoices), which is a PDF/A-3b that carries the invoice as XML.
+
+The render is `failed`; no file is stored, no ordinary PDF is delivered instead, and a failed render costs nothing.
+
+The problem carries one of these:
+
+- `reason`, the first line of what the converter said, when the PDF could not be converted.
+- `pdfa` or `einvoice`, the validator's report, when it could not judge the file: no finding in it names a rule.
+
+Until 1 November 2026 this code also answered for files the validator refused. Renders that failed then keep it, with the rules in their report.
+
+**Fix.**
+
+Send the `render_id` to support@formfeed.dev. A document that Formfeed rendered and cannot convert is ours to fix.
+
+**Retry.**
+
+No. The same document fails the same way. Async renders are not retried for this code either.
+
+## 422 pdfa_validation_failed
+
+The validator judged the converted file and found that it breaks rules of PDF/A. It is the error of two kinds of render:
 
 - a render with [`pdf.pdfa`](https://docs.formfeed.dev/templates/pdf-a), which asked for a PDF/A-2b or PDF/A-3b;
 - an [e-invoice](https://docs.formfeed.dev/templates/e-invoices), which is a PDF/A-3b that carries the invoice as XML.
 
 The render is `failed`; no file is stored, no ordinary PDF is delivered instead, and a failed render costs nothing.
 
-The problem carries one of these:
+The problem carries the validator's report:
 
-- `pdfa`, the report of the validator, for a render with `pdf.pdfa`. Its `messages` name the clause of PDF/A (`rule`) and the object of the PDF (`location`). An e-invoice that set `pdf.pdfa` carries it beside `einvoice`. The failed render keeps the same report.
-- `einvoice`, the report of the validator, for an e-invoice whose converted file was checked and refused. Its `validation.messages` with `"part": "pdf"` name the clause of PDF/A and the object of the PDF.
-- `reason`, the first line of what the converter said, when the PDF could not be converted at all.
+- `pdfa`, for a render with `pdf.pdfa`. Its `messages` name the clause of PDF/A (`rule`) and the object of the PDF (`location`). An e-invoice that set `pdf.pdfa` carries it beside `einvoice`. The failed render keeps the same report.
+- `einvoice`, for an e-invoice. Its `validation.messages` with `"part": "pdf"` name the clause of PDF/A and the object of the PDF.
 
 **Causes.**
 
 - A font that is not embedded (`6.2.11.4.1-1`). PDF/A needs every font inside the file. A PDF of the file library that is appended with `post.merge_after` can bring such a font.
 - A font whose embedded program disagrees with the widths the PDF states (`6.2.11.5-1`). The office converter writes such a font for OpenType fonts with CFF outlines, which on our side is the font for Chinese, Japanese and Korean text in a Word or PowerPoint template.
 - With `"pdfa": "2b"`: a file attached to the document that is not itself PDF/A (`6.8-5`). PDF/A-2 takes no other attachment; PDF/A-3 takes any.
-- A failure of the converter itself, reported in `reason`.
+- A template past one of the limits of PDF/A: a link or `<title>` longer than 32,767 bytes (`6.1.13-3`), an `id` longer than 127 bytes that a link points to (`6.1.13-4`), a page wider or longer than about 5.08 m (`6.1.13-11`). Links and `id`s count percent-encoded, so `ü` takes 6 bytes.
 
 **Fix.**
 
 - Read `pdfa.messages`, or `einvoice.validation.messages` for an e-invoice, to see which clause of PDF/A the file breaks, and where. [What fails and why](https://docs.formfeed.dev/templates/pdf-a#what-fails-and-why) explains each rule.
 - For a font that is not embedded in an appended PDF: create that PDF again with its fonts embedded, or leave it out of the PDF/A.
+- For Chinese, Japanese or Korean text in a Word or PowerPoint template: render it from an HTML template.
 - For an attachment at `"2b"`: ask for `"3b"`.
-- For anything else, send the `render_id` to support@formfeed.dev. A document that Formfeed rendered and cannot convert is ours to fix.
+- For a limit of PDF/A: shorten the link, the `<title>` or the `id`, or split the document over several pages.
+- For anything else, send the `render_id` to support@formfeed.dev, so that we can look at it.
 
 **Retry.**
 
-No. The same document fails the same way. Async renders are not retried for this code either.
+No. The same document fails the same way, and async renders are not retried for this code either. Change what the report names and send the request with a new `Idempotency-Key` or none: as with every `4xx`, the old key returns this answer again for 24 hours.
 
 ## 422 pdfua_validation_failed
 
