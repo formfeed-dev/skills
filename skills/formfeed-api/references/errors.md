@@ -96,6 +96,8 @@ No. The same request gets the same answer. Change it as above, then send it agai
 
 The service that turns a rendered PDF into an [e-invoice](https://docs.formfeed.dev/templates/e-invoices) or a [PDF/A](https://docs.formfeed.dev/templates/pdf-a) and validates it, and that validates a file rendered with [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf), is busy or not reachable right now. Where a second attempt could help, Formfeed has already made it. A render that asked for an e-invoice or for PDF/A never comes back as a plain PDF instead, and one that asked for PDF/UA-1 never comes back unchecked: you get the validated file or this problem. The answer carries `Retry-After` (5 seconds). Nothing was charged.
 
+From [`POST /einvoices/validate`](https://docs.formfeed.dev/api/einvoice-validation), the code says that the machines which validate uploaded e-invoices are busy, one validation at a time each, or not reachable. It comes at once, with `Retry-After`, and the validation is given back to the day.
+
 **Causes.**
 
 - Many e-invoices, PDF/A or PDF/UA files at the same time in your region. Each file is converted or validated on its own, so bursts queue up (_The conformance service is busy; retry shortly_).
@@ -133,7 +135,7 @@ The check runs before anything is rendered, recorded or counted, so the failed r
 - Compare your data with `GET /v1/templates/{id}/schema`, or check it without rendering with [`POST /v1/templates/{id}/validate`](https://docs.formfeed.dev/api/templates#validate).
 - Generate types from the schema with `formfeed types`, so your code cannot send data of the wrong shape. See [Typed template data](https://docs.formfeed.dev/templates/typed-data).
 
-A request with `validate_data: true` for a template version without a stored schema, or for `html` or a `url`, is refused with [`invalid_request`](https://docs.formfeed.dev/errors/invalid-request) instead.
+A request with `validate_data: true` for a template version without a stored schema, or for `html`, `markdown` or a `url`, is refused with [`invalid_request`](https://docs.formfeed.dev/errors/invalid-request) instead.
 
 **Retry.**
 
@@ -243,12 +245,15 @@ No. The same invoice stops the same rules. Async renders are not retried for thi
 
 The uploaded file is larger than the limit for where it goes. `bytes` is the size of the file, `limit` the limit that applied, both in bytes. Nothing was stored or charged.
 
-| Upload                                                                     | Limit  |
-| -------------------------------------------------------------------------- | ------ |
-| A file for the workspace's [file library](https://docs.formfeed.dev/api/files) (`POST /v1/files`) | 10 MB  |
-| An office document sent to [`/pdf/convert`](https://docs.formfeed.dev/api/pdf-tools#convert)      | 20 MB  |
-| The file of a [Word or PowerPoint template](https://docs.formfeed.dev/templates/office-templates) | 20 MB  |
-| A logo of the brand kit, in the app                                        | 512 kB |
+A request whose `Content-Length` is already above the limit and its form fields (64 kB on top of the file's limit; 8 MB more for a template's other fields) is answered at once, before its body is read: then `bytes` is the request's length and `limit` the request's limit. A request that declares no length is stopped as soon as it grows past the limit, with `bytes` null.
+
+| Upload                                                                              | Limit  |
+| ----------------------------------------------------------------------------------- | ------ |
+| A file for the workspace's [file library](https://docs.formfeed.dev/api/files) (`POST /v1/files`)          | 10 MB  |
+| An office document sent to [`/pdf/convert`](https://docs.formfeed.dev/api/pdf-tools#convert)               | 20 MB  |
+| The file of a [Word or PowerPoint template](https://docs.formfeed.dev/templates/office-templates)          | 20 MB  |
+| An e-invoice XML sent to [`/einvoices/validate`](https://docs.formfeed.dev/api/einvoice-validation#upload) | 4 MB   |
+| A logo of the brand kit, in the app                                                 | 512 kB |
 
 **Causes.**
 
@@ -275,6 +280,7 @@ The uploaded file is not one Formfeed takes here. The type is read from the file
 | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | [`/pdf/convert`](https://docs.formfeed.dev/api/pdf-tools#convert)                                 | DOCX, XLSX, PPTX, ODT, ODS, ODP, DOC, XLS, PPT, RTF and HTML |
 | The file of a [Word or PowerPoint template](https://docs.formfeed.dev/templates/office-templates) | DOCX for a `docx` template, PPTX for a `pptx` template       |
+| An e-invoice to [validate](https://docs.formfeed.dev/api/einvoice-validation#upload)              | The XML, CII or UBL; not a PDF                               |
 
 Documents with macros are refused everywhere.
 
@@ -284,12 +290,14 @@ Documents with macros are refused everywhere.
 - A macro-enabled document (`.docm`, `.xlsm`, `.pptm`) or one that contains a VBA project or Basic macros.
 - A template or slide show format (`.dotx`, `.xltx`, `.potx`, `.ppsx`) or a binary workbook (`.xlsb`).
 - A PowerPoint file uploaded for a Word template, or the other way round (_A docx template takes a Word (DOCX) file; this one is pptx_).
+- A ZUGFeRD or Factur-X PDF sent to `/einvoices/validate`, which reads the XML only.
 
 **Fix.**
 
 - Save the document as DOCX, XLSX or PPTX in Word, Excel or PowerPoint (File › Save As), which also removes macros.
 - Send PDFs to the other PDF tools instead: `/pdf/merge`, `/pdf/protect`, `/pdf/watermark`.
 - For a template, upload the format the template was created as, or create a new template of the other kind.
+- For an e-invoice, send its XML. A ZUGFeRD or Factur-X PDF that Formfeed rendered is answered by its render id.
 
 **Retry.**
 
@@ -313,16 +321,18 @@ Missing scopes:
 
 Plan limits (`feature`):
 
-| `feature`         | Refused                                                                                                                                                                                                                                                                                         | Allowed from   |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `post_processing` | `/pdf/merge`, `/pdf/protect`, `/pdf/watermark`, or a `post` block with `merge_after`, `watermark` or `password`. `/pdf/info` works on every plan.                                                                                                                                               | Starter        |
-| `office`          | `/pdf/convert`, and live renders of [Word and PowerPoint templates](https://docs.formfeed.dev/templates/office-templates). On Free, test renders of these templates make the marked PDF.                                                                                                                               | Starter        |
-| `channels`        | Rendering or setting a named [release channel](https://docs.formfeed.dev/templates/release-channels#plans) on Free; on Starter and Pro, a new channel beyond the plan's number per template (with `limit`: 2 on Starter, 10 on Pro and Business).                                                                      | Starter        |
-| `canary`          | A channel with a canary.                                                                                                                                                                                                                                                                        | Pro            |
-| `byo_storage`     | Connecting a bucket for [bring your own storage](https://docs.formfeed.dev/api/bring-your-own-storage).                                                                                                                                                                                                                | Pro            |
-| `templates`       | A new template, a copy or a restored one when the organisation already has the plan's number (`limit`: 5 on Free). Archived templates do not count.                                                                                                                                             | Starter        |
-| `webhooks`        | A new [webhook endpoint](https://docs.formfeed.dev/api/webhooks) when the organisation already has the plan's number (`limit`: 1 on Free, 5 on Starter), disabled ones included. `formfeed listen` sessions do not count.                                                                                              | Pro            |
-| `einvoice`        | An [e-invoice](https://docs.formfeed.dev/templates/e-invoices#plans-and-units) from a live render on Free; or from a test render once the day's test e-invoices are used up (Free 20, Starter 100, Pro 500, Business 2,000). The second answer carries `limit`, `used` and `resets_at`, the start of the next UTC day. | Starter (live) |
+| `feature`             | Refused                                                                                                                                                                                                                                                                                         | Allowed from   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `post_processing`     | `/pdf/merge`, `/pdf/protect`, `/pdf/watermark`, or a `post` block with `merge_after`, `watermark` or `password`. `/pdf/info` works on every plan.                                                                                                                                               | Starter        |
+| `office`              | `/pdf/convert`, and live renders of [Word and PowerPoint templates](https://docs.formfeed.dev/templates/office-templates). On Free, test renders of these templates make the marked PDF.                                                                                                                               | Starter        |
+| `channels`            | Rendering or setting a named [release channel](https://docs.formfeed.dev/templates/release-channels#plans) on Free; on Starter and Pro, a new channel beyond the plan's number per template (with `limit`: 2 on Starter, 10 on Pro and Business).                                                                      | Starter        |
+| `canary`              | A channel with a canary.                                                                                                                                                                                                                                                                        | Pro            |
+| `byo_storage`         | Connecting a bucket for [bring your own storage](https://docs.formfeed.dev/api/bring-your-own-storage).                                                                                                                                                                                                                | Pro            |
+| `templates`           | A new template, a copy or a restored one when the organisation already has the plan's number (`limit`: 5 on Free). Archived templates do not count.                                                                                                                                             | Starter        |
+| `webhooks`            | A new [webhook endpoint](https://docs.formfeed.dev/api/webhooks) when the organisation already has the plan's number (`limit`: 1 on Free, 5 on Starter), disabled ones included. `formfeed listen` sessions do not count.                                                                                              | Pro            |
+| `einvoice_validation` | [Validating an uploaded e-invoice](https://docs.formfeed.dev/api/einvoice-validation#daily) on Free; or once the organisation's validations of the day are used up (Starter 100, Pro 500, Business 2,000), with `limit`, `used` and `resets_at`. A render's own report is answered on every plan.                      | Starter        |
+| `einvoice_uploads`    | Validating an uploaded e-invoice before uploads are open for the organisation. A render's own report is answered.                                                                                                                                                                               | —              |
+| `einvoice`            | An [e-invoice](https://docs.formfeed.dev/templates/e-invoices#plans-and-units) from a live render on Free; or from a test render once the day's test e-invoices are used up (Free 20, Starter 100, Pro 500, Business 2,000). The second answer carries `limit`, `used` and `resets_at`, the start of the next UTC day. | Starter (live) |
 
 Callers that may not do this:
 
@@ -335,6 +345,7 @@ Callers that may not do this:
 - For a scope: `detail` names it. Create a key that has it; scopes cannot be added to an existing key. The [scope table](https://docs.formfeed.dev/api/authentication#scopes) says which endpoint needs which scope.
 - For `post_processing`, `office`, `channels`, `canary`, `byo_storage`, `templates` or `webhooks`: upgrade the plan. Test keys on a paid plan can try a feature for free. For `channels`, you can also keep rendering and moving the `published` channel, which every plan has; for `templates`, archive a template you no longer use; for `webhooks`, delete an endpoint you no longer use (a no-code trigger removes its own when it is switched off).
 - For `einvoice`: render with a test key to try it, wait until `resets_at` when the day is used up, or render live on Starter and above, which has no daily number. To get a plain PDF from a template that declares an e-invoice, send `"post": { "einvoice": false }`.
+- For `einvoice_validation`: upgrade from Free, or wait until `resets_at` when the day is used up. Validating a render of the workspace by its id never counts.
 - For a browser call: call the API from your backend and hand the browser the result, for example the render's `download_url`.
 - For an agent or the app-only routes: do it in the app, signed in as an owner or admin.
 
@@ -349,13 +360,15 @@ The request could not be accepted as it is: the body is not JSON, a field has th
 **Causes.**
 
 - The body is not a JSON object, for example because it is empty or cut off. `issues` then has one entry with an empty `path`.
-- A render names no source, or more than one: send exactly one of `template`, `html` or `url`.
+- A render names no source, or more than one: send exactly one of `template`, `html`, `url` or `markdown`.
 - A value outside its list, such as `"mode": "later"` or `"output": "gif"`, or a field of the wrong type.
-- An output the source cannot make: a PDF or image template, `html` and `url` make `pdf`, `png`, `jpg` or `webp`; a Word template `docx` or `pdf`; a PowerPoint template `pptx` or `pdf` (`field: "output"`, with the `allowed` values).
+- An output the source cannot make: a PDF or image template, `html`, `url` and `markdown` make `pdf`, `png`, `jpg` or `webp`; a Word template `docx` or `pdf`; a PowerPoint template `pptx` or `pdf` (`field: "output"`, with the `allowed` values).
 - `version` is not `published`, a channel name, `latest` or a version number, or it is `latest` with a live key. Only a test key renders the latest draft.
 - A `url` or `webhook_url` that the static address rules refuse: not a valid URL, a scheme other than `https` (a `url` may also be `http`), a user name or password in the URL, or a host that is private, loopback, link-local, a cloud metadata address, `localhost`, a numeric shorthand such as `2130706433`, or a name under `.internal`, `.local`, `.localhost` or `.fly.dev`. The `message` starts with `URL rejected:`. A name that only resolves to a private address is refused later, with [`navigation_failed`](https://docs.formfeed.dev/errors/navigation-failed).
 - `webhook_secret` without `webhook_url`, or shorter than 16 characters.
-- `validate_data: true` for `html` or a `url`, or for a template version without a stored data schema (`field: "validate_data"`). See [Check the data first](https://docs.formfeed.dev/api/rendering#validate-data).
+- A `settings.markdown` block the API does not take (an unknown key, a theme or mode that does not exist, `css` over 256 kB), or one beside a source that is not `markdown` (`field: "settings.markdown…"`). See [Markdown to PDF](https://docs.formfeed.dev/api/markdown#look).
+- A `markdown` text of more than 1 MB of UTF-8.
+- `validate_data: true` for `html`, `markdown` or a `url`, or for a template version without a stored data schema (`field: "validate_data"`). See [Check the data first](https://docs.formfeed.dev/api/rendering#validate-data).
 - `post` (merge, watermark, password) on an output other than PDF, a watermark with both `text` and `image` or neither, or `merge_after` sources stored in another region than the render.
 - An [e-invoice](https://docs.formfeed.dev/templates/e-invoices) asked for on an image, or together with a password (`field: "post.password"`): PDF/A forbids encryption.
 - [`pdf.ua`](https://docs.formfeed.dev/templates/accessible-pdf) with a value other than `true`, `false` or `{ "check": "strict" | "report" }`, on an image, on a Word or PowerPoint template, or together with `post.merge_after`.
@@ -841,7 +854,7 @@ A step of the render took longer than its limit. There is no limit on the render
 
 | Step                                                                                                                                             | Limit                                                 | `detail`                                                                                                                                         |
 | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The template language (Jinja2, Handlebars) fills the template with the data                                                                      | 5 seconds                                             | _Template render took 6120 ms; the limit is 5000 ms_                                                                                             |
+| The template language (Jinja2, Liquid, Handlebars) fills the template with the data                                                              | 5 seconds                                             | _Template render took 6120 ms; the limit is 5000 ms_                                                                                             |
 | Chromium loads the document, until none of its requests is running ([`waitFor.networkIdle`](https://docs.formfeed.dev/templates/settings#waiting-for-content) says how) | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
 | Waiting until an element matching [`waitFor.selector`](https://docs.formfeed.dev/templates/settings#waiting-for-content) is visible                                     | `waitFor.timeoutMs`, 5 seconds by default, at most 30 | _Render exceeded 30000 ms_ (the message names 30 seconds in any case)                                                                            |
 | Taking the picture of an image output, or of the element of `image.clipSelector`                                                                 | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
@@ -850,7 +863,7 @@ A step of the render took longer than its limit. There is no limit on the render
 | Converting a Word or PowerPoint template, or a document sent to `/pdf/convert`, to PDF                                                           | 60 seconds for the whole render or conversion         | _The conversion did not finish in time_                                                                                                          |
 | Making an [e-invoice](https://docs.formfeed.dev/templates/e-invoices) or a [PDF/A](https://docs.formfeed.dev/templates/pdf-a), or validating a [PDF/UA-1 file](https://docs.formfeed.dev/templates/accessible-pdf)    | 20 seconds                                            | _The e-invoice conversion did not finish in time_, _The PDF/A conversion did not finish in time_, _The PDF/UA validation did not finish in time_ |
 
-A document of several hundred pages prints in tens of seconds, well inside its limit. A `waitFor.delayMs` pause has no limit of its own and is capped at 10 seconds. A Liquid template that runs longer than 5 seconds answers [`template_runtime_error`](https://docs.formfeed.dev/errors/template-runtime) instead, and a `url` render whose page does not load in 30 seconds answers [`navigation_failed`](https://docs.formfeed.dev/errors/navigation-failed).
+A document of several hundred pages prints in tens of seconds, well inside its limit. A `waitFor.delayMs` pause has no limit of its own and is capped at 10 seconds. A `url` render whose page does not load in 30 seconds answers [`navigation_failed`](https://docs.formfeed.dev/errors/navigation-failed) instead.
 
 Handlebars partials nested deeper than 8 levels also answer this code (_Partials nest deeper than 8_), although no time ran out. Jinja2 and Liquid have no such depth limit.
 
@@ -931,6 +944,7 @@ A source exists, but it cannot be processed: the render has not succeeded, the f
 - A PDF that cannot be read, for example a damaged file in the library (_terms.pdf is not a readable PDF_).
 - `/pdf/convert` with a render whose output is not a Word or PowerPoint document; PDFs and images need no conversion.
 - An office document that LibreOffice refuses to read (_The document cannot be converted_, with the converter's `reason`).
+- [`/einvoices/validate`](https://docs.formfeed.dev/api/einvoice-validation#render) with a render that made no e-invoice or is still running, or that failed while another rule set (`rules`) is asked for. A failed render's stored report is answered without `rules`.
 
 **Fix.**
 
@@ -953,6 +967,7 @@ A source the request names cannot be found. Sources are what the [PDF tools](htt
 - A library file name that the workspace does not have (_No file terms.pdf in this workspace's library_), in `sources`, `post.merge_after` or a watermark's `image` (`field`: `watermark.image` or `post.watermark.image`).
 - A library file named by its `fil_…` id. The id is not accepted as a source yet and answers this code; name the file by its name instead.
 - An object that disappeared between the check and the render (_… is not in storage any more_).
+- [`/einvoices/validate`](https://docs.formfeed.dev/api/einvoice-validation#render) asked for another rule set (`rules`) of a render whose file was deleted or has expired. Its stored report is still answered without `rules`.
 
 **Fix.**
 
@@ -1051,7 +1066,7 @@ The template compiled, but failed while it ran with the data of this request. No
 - A method called on a missing value, for example `customer.name.upper()` when `customer` is not in the data.
 - An include of a partial that was never pushed with the template, for example one added to `partials/` after the last `formfeed templates push` (see [Partials](https://docs.formfeed.dev/templates/writing-templates#partials)), or of a [shared partial](https://docs.formfeed.dev/templates/shared-partials) that was deleted, renamed or written for another template language.
 - A partial that includes itself (in Handlebars: _Maximum call stack size exceeded_).
-- A Liquid template that runs longer than the 5 seconds a template may take. Jinja2 and Handlebars report that as [`render_timeout`](https://docs.formfeed.dev/errors/render-timeout).
+- A [`range`](https://docs.formfeed.dev/templates/helpers#collections) of more than 100,000 numbers (_range() would yield … items; a template may ask for at most 100,000_). A template that runs longer than the 5 seconds it may take answers [`render_timeout`](https://docs.formfeed.dev/errors/render-timeout), in every template language.
 
 Rarely, the render service reports a failure of its own under this code, for example a browser that crashed. Then `detail` does not refer to your template at all. Retry once, and if it repeats, send the `request_id` to support@formfeed.dev.
 

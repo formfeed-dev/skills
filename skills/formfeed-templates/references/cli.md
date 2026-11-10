@@ -75,13 +75,14 @@ Compile locally and print diagnostics; exit 1 on errors. **local**.
 
 ### `formfeed einvoice <slug>`
 
-Write the e-invoice XML of a data set, offline: the XML a render embeds in the PDF. **local**.
+Write the e-invoice XML of a data set, offline: the XML a render embeds in the PDF. **local**: `--validate` sends the written XML to the API's validator, which counts one of the organisation's validations of the day.
 
 | Flag | Meaning |
 | --- | --- |
 | `--data <name-or-file>` | data set name or a JSON file |
 | `--out <file>` | output file (default: <slug>.xml) |
 | `--profile <profile>` | basic or en16931 (default: the template's settings, else en16931) |
+| `--validate` | also send the written file to the API's validator, which says which rules it passed; it counts one of the organisation's validations of the day, Starter plan and above |
 
 ### `formfeed render <slug>`
 
@@ -282,14 +283,18 @@ Remove a file from the workspace library (the local copy stays). **changes the w
 
 ### `formfeed pdf convert <source>`
 
-Convert a Word, Excel, PowerPoint, OpenDocument, RTF or HTML file to PDF (Starter plan and above); a render id (rnd_…) of a Word or PowerPoint template converts its output. **renders: units with a live key**: Starter plan and above.
+Convert a Word, Excel, PowerPoint, OpenDocument, RTF or HTML file to PDF (Starter plan and above); a render id (rnd_…) of a Word or PowerPoint template converts its output. A Markdown file (.md) is rendered as a Markdown document on every plan, its pictures inside its folder sent along. **renders: units with a live key**: Starter plan and above.
 
 | Flag | Meaning |
 | --- | --- |
 | `--out <file>` | output file (default: the file name with .pdf, or <render id>.pdf) |
 | `--page-ranges <ranges>` | pages to convert, e.g. 1-3,5 |
-| `--landscape` | landscape for spreadsheets and documents without their own page setup |
+| `--landscape` | landscape for spreadsheets, Markdown and documents without their own page setup |
 | `--single-page-sheets` | each spreadsheet sheet on one page |
+| `--theme <theme>` | Markdown: document (default) or none |
+| `--css <file>` | Markdown: a stylesheet after the theme |
+| `--settings <file>` | Markdown: a JSON file of render settings, which the other options go over |
+| `--raw-html` | Markdown: write raw HTML in the text as it stands instead of showing it as text |
 | `--no-download` | create the PDF render without downloading it |
 
 ### `formfeed renders get <id>`

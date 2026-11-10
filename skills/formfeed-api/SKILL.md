@@ -63,6 +63,37 @@ What to get right:
   `client.renders.batch(...)`, then `client.jobs.waitFor(job.id)`. Its items come back in the order
   they were sent.
 
+## A Markdown document
+
+A report, notes or an answer that is already Markdown needs no template:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { Formfeed } from '@formfeed/sdk';
+
+const client = new Formfeed({ apiKey: process.env.FORMFEED_API_KEY! });
+
+const render = await client.renders.create({
+  markdown: await readFile('report.md', 'utf8'),
+  settings: { pdf: { outline: true } },
+  filename: 'report.pdf',
+});
+```
+
+- **`markdown`** takes the place of `template`: a document of at most 1 MB, in GitHub Flavored
+  Markdown with footnotes. A YAML front matter block gives the PDF its title, author, subject and
+  keywords; without one the first heading is the title. A line `\newpage` starts a new page.
+- **Raw HTML in the text is shown as text.** `settings.markdown.html: 'allow'` writes it as it
+  stands, scripts included: only for Markdown the application wrote itself, never for text from a
+  user or a model.
+- **The look** is the `document` theme, in the brand kit's fonts and colour where the workspace has
+  one. `settings.markdown.theme: 'none'` with `settings.markdown.css` gives it a look of its own.
+- **With an `engine`** the text is a template over `data` first, as `html` with an engine is.
+- **A picture** named by a bare file name, such as `logo.png`, is a file of the workspace library.
+  A picture from the disk goes as a `data:image/` address; `formfeed pdf convert report.md` sends
+  the pictures inside the file's folder that way by itself.
+- Every plan, one unit per started five pages, as for any PDF. `validate_data` does not apply.
+
 ## Retries, idempotency and errors
 
 - The SDKs retry `429` and `503` after the server's `Retry-After`, and send an `Idempotency-Key`

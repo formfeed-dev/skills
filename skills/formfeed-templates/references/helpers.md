@@ -213,13 +213,13 @@ Escapes the text and turns line breaks into <br>.
 
 ### `markdown`
 
-`markdown(value)`
+`markdown(value, { html, breaks })`
 
-Renders Markdown to HTML (no sanitiser: template data is trusted by the author).
+Renders Markdown to HTML: GitHub Flavored Markdown (tables, task lists, strikethrough, autolinks) and footnotes. Raw HTML in the text passes as written, because template data is the author's; `html: 'safe'` shows it as text instead, for Markdown from someone else. Links and pictures keep to safe addresses either way. `breaks: true` makes every line break a `<br>`, as in a chat. A text of more than 1 MB stops the render.
 
-- Jinja2: `{{ notes \| markdown }}`
-- Liquid: `{{ notes \| markdown }}`
-- Handlebars: `{{markdown notes}}`
+- Jinja2: `{{ notes \| markdown({ html: 'safe' }) }}`
+- Liquid: `{{ notes \| markdown: html: 'safe' }}`
+- Handlebars: `{{markdown notes html='safe'}}`
 
 ### `safe`
 
@@ -361,7 +361,7 @@ Splits a list into lists of `size` items (rows of labels, columns).
 
 `range(start, end?, step = 1)`
 
-List of numbers from start to end (exclusive).
+List of numbers from start to end (exclusive), at most 100,000.
 
 - Jinja2: `{% for i in range(1, 4) %}{{ i }}{% endfor %}`
 - Liquid: `{% assign nums = 1 \| range: 4 %}{% for i in nums %}{{ i }}{% endfor %}`
