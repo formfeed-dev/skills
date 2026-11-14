@@ -1,6 +1,6 @@
 {
   "name": "formfeed",
-  "version": "0.3.24",
+  "version": "0.3.25",
   "description": "Write and check Formfeed templates and the code that renders them, and render PDFs and images from your templates, from your coding agent. Signs in with your Formfeed account.",
   "mcpServers": {
     "formfeed": {

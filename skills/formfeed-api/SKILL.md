@@ -94,6 +94,43 @@ const render = await client.renders.create({
   the pictures inside the file's folder that way by itself.
 - Every plan, one unit per started five pages, as for any PDF. `validate_data` does not apply.
 
+## A PDF that already exists
+
+A form to fill, a document to redact, or one to split, compress or show as a picture needs no
+template either:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import { Formfeed } from '@formfeed/sdk';
+
+const client = new Formfeed({ apiKey: process.env.FORMFEED_API_KEY! });
+const file = { data: await readFile('antrag.pdf'), name: 'antrag.pdf' };
+
+const info = await client.pdf.info({ file });
+console.log(info.form?.fields.map((field) => `${field.name} (${field.type})`));
+
+const filled = await client.pdf.fill(
+  { file },
+  { fields: { 'customer.name': 'Erika Mustermann' }, flatten: true },
+);
+console.log(filled.form?.skipped, filled.form?.warnings);
+```
+
+- **The PDF** is a render (`rnd_…`), a file of the library by name or `fil_…` id, or `{ file }`,
+  an upload of up to the plan's output size and 100 MB that is never stored. Every tool but `info`
+  answers with a new render; several files come back as one ZIP (`output: 'zip'`).
+- **`pdf.info`** lists a form's fields by the full names `pdf.fill` takes, with their type, value
+  and the options a choice or a radio group takes. Free on every plan.
+- **`pdf.fill`** fails on a name the form lacks (`422 form_field_unknown`) or a value its field
+  does not take (`422 form_value_invalid`); `strict: false` leaves both out and lists them in the
+  render's `form.skipped`. No calculation or display format of the form runs, and `form.warnings`
+  names the fields that have one.
+- **`pdf.redact`** removes rectangles and texts from the file itself and reads the result again: a
+  text that is still there is `422 redaction_incomplete`, and no file is delivered. Say what it did,
+  that the text was removed and the result checked, never that the file is secure or compliant.
+- **`pdf.split`**, **`pdf.compress`** and **`pdf.toImage`** cut, shrink and draw pages. All of these
+  tools need the Starter plan; `toImage` costs one unit per picture, the others 0.5 units each.
+
 ## Retries, idempotency and errors
 
 - The SDKs retry `429` and `503` after the server's `Retry-After`, and send an `Idempotency-Key`

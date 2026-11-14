@@ -297,6 +297,71 @@ Convert a Word, Excel, PowerPoint, OpenDocument, RTF or HTML file to PDF (Starte
 | `--raw-html` | Markdown: write raw HTML in the text as it stands instead of showing it as text |
 | `--no-download` | create the PDF render without downloading it |
 
+### `formfeed pdf split <source>`
+
+Cut a PDF into parts (Starter plan and above): --every N pages, or one part per --range. The result is a ZIP of the parts, or the PDF for one part. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **renders: units with a live key**: Starter plan and above.
+
+| Flag | Meaning |
+| --- | --- |
+| `--every <pages>` | pages per part |
+| `--range <pages>` | one part per page selection, e.g. 1-3,5 or 4- for page 4 to the last (repeatable) |
+| `--out <file>` | output file (default: the name the API gives it, e.g. contract.zip) |
+| `--no-download` | create the render without downloading it |
+
+### `formfeed pdf compress <source>`
+
+Make a PDF smaller (Starter plan and above); the source comes back as it was when it cannot be made smaller. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **renders: units with a live key**: Starter plan and above.
+
+| Flag | Meaning |
+| --- | --- |
+| `--out <file>` | output file (default: the source's name with -compressed, e.g. contract-compressed.pdf) |
+| `--no-download` | create the render without downloading it |
+
+### `formfeed pdf to-image <source>`
+
+Draw pages of a PDF as PNG or JPEG pictures (Starter plan and above, one unit per picture): one page gives the picture, several a ZIP of them. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **renders: units with a live key**: Starter plan and above; one unit per picture.
+
+| Flag | Meaning |
+| --- | --- |
+| `--pages <pages>` | pages to draw, e.g. 1, 1-3,5 or 2- (default: every page) |
+| `--format <format>` | png (default) or jpg |
+| `--dpi <dpi>` | resolution, 36 to 300 (default 150) |
+| `--quality <quality>` | JPEG quality, 1 to 100 |
+| `--out <file>` | output file (default: the name the API gives it, e.g. contract-1.png) |
+| `--no-download` | create the render without downloading it |
+
+### `formfeed pdf redact <source>`
+
+Remove what lies under rectangles and every place a text stands from a PDF, not just from view, and check the result (Starter plan and above). Text that is still there fails with exit code 1 and delivers nothing. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **renders: units with a live key**: Starter plan and above.
+
+| Flag | Meaning |
+| --- | --- |
+| `--rect <page:x,y,width,height>` | a rectangle in points from the top-left corner of the page as a viewer shows it, e.g. 1:52,88,200,16 (repeatable) |
+| `--text <text>` | a text to remove wherever it stands, whatever its spacing (repeatable) |
+| `--match-case` | find a text only in the case it is written in |
+| `--whole-words` | find a text only as a whole word |
+| `--fill <colour>` | colour of the box over each removed place (default #000000) |
+| `--no-fill` | draw no box over the removed places |
+| `--out <file>` | output file (default: the source's name with -redacted, e.g. contract-redacted.pdf) |
+| `--no-download` | create the render without downloading it |
+
+### `formfeed pdf fill <source>`
+
+Fill a PDF form by its fields' full names, as pdf info lists them, and keep it fillable, or draw the values into the pages with --flatten (Starter plan and above). The values are never stored. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **renders: units with a live key**: Starter plan and above.
+
+| Flag | Meaning |
+| --- | --- |
+| `--data <file>` | a JSON file of values by field name: text, a number, true or false for a check box, a list for a list box |
+| `--field <name=value>` | one value over --data; true and false set a check box (repeatable) |
+| `--flatten` | draw the values into the pages and remove the fields |
+| `--lenient` | leave out a name the form lacks or a value its field does not take, and list them, instead of failing |
+| `--out <file>` | output file (default: the source's name with -filled, e.g. form-filled.pdf) |
+| `--no-download` | create the render without downloading it |
+
+### `formfeed pdf info <source>`
+
+Pages, sizes, encryption, metadata and the form of a PDF, with each field's name, type, value and options: the names pdf fill takes. Free, and makes no render. SOURCE is a PDF on this machine (uploaded and never stored), a render id (rnd_…) or a library file id (fil_…). **reads the API**.
+
 ### `formfeed renders get <id>`
 
 Show one render. **reads the API**.

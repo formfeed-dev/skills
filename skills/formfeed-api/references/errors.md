@@ -353,6 +353,108 @@ Callers that may not do this:
 
 No. The same request gets the same answer. Fix what the problem names, then send the request again with a new `Idempotency-Key` or without one: a `4xx` answer is stored under its key for 24 hours, so the old key returns this problem again. See [retrying](https://docs.formfeed.dev/api/errors#retries).
 
+## 422 form_field_unknown
+
+[`/pdf/fill`](https://docs.formfeed.dev/api/pdf-tools#fill) named a field the form does not have. The call was strict, which is the default, so nothing was filled and nothing was charged. `field` gives the name as you sent it. Fields are named by their full name, its parts joined by dots, as [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) lists them.
+
+**Causes.**
+
+- A typo, or a name from another edition of the form.
+- A short name where the form nests its fields: `name` for a field the form calls `customer.name`.
+
+**Fix.**
+
+- List the form's fields with [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) and take the names from `form.fields`.
+- Send `strict: false` to leave names the form lacks out: the render's `form.skipped` lists them with the reason `unknown`.
+
+**Retry.**
+
+Not with the same request: the form has no field of that name.
+
+## 422 form_filling_not_permitted
+
+The PDF given to [`/pdf/fill`](https://docs.formfeed.dev/api/pdf-tools#fill) opens without a password, but its author restricted editing, and the restrictions do not allow filling its form. Formfeed keeps to them, so nothing was filled and nothing was charged.
+
+A form whose restrictions allow filling, as public forms with an owner password usually do, is filled, and keeps its restrictions and its owner password.
+
+**Causes.**
+
+- A PDF protected with an owner password and every change forbidden, form filling included.
+
+**Fix.**
+
+- Ask whoever publishes the form for a version that allows filling.
+- If the form is yours, lift the restrictions with its owner password in your PDF program, or allow filling forms, then fill it.
+
+**Retry.**
+
+Not with the same file.
+
+## 422 form_signed
+
+The PDF given to [`/pdf/fill`](https://docs.formfeed.dev/api/pdf-tools#fill) is signed: a signature field holds a signature, or the form says signatures exist. Filling it would change the signed file and invalidate its signatures, so nothing was filled and nothing was charged. [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) says `"signed": true` for such a file.
+
+**Causes.**
+
+- A form signed by its author, or one filled and signed before it was sent on.
+
+**Fix.**
+
+- Fill the form before it is signed, and sign the filled file.
+- Ask for an unsigned copy of the form.
+
+**Retry.**
+
+Not with the same file.
+
+## 422 form_value_invalid
+
+[`/pdf/fill`](https://docs.formfeed.dev/api/pdf-tools#fill) gave a field a value it does not take. The call was strict, which is the default, so nothing was filled and nothing was charged. `field` names the field and `rule` says what the value broke; the value itself is never repeated, since a problem lands in logs and webhook events.
+
+| `rule`           | The value                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `not_text`       | was no text or number, for a text field.                                                            |
+| `too_long`       | is longer than the field's length limit.                                                            |
+| `not_an_option`  | is none of the field's `options`: a dropdown, list box, radio group or check box takes one of them. |
+| `not_a_boolean`  | was `true` for a check box with several on-values, which takes one of its `options` instead.        |
+| `several_values` | was a list for a list box that takes one choice.                                                    |
+| `not_fillable`   | was given to a signature field or a button, which take none.                                        |
+| `no_font`        | has characters no font of the PDF tools has, when `flatten` draws it into the page.                 |
+
+**Causes.**
+
+- A choice given by what it shows rather than by its export value, which is what a form stores: [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) lists the export values as `options`.
+- A text longer than the field allows, which a viewer would have stopped while typing.
+
+**Fix.**
+
+- Read the field's `type`, `options` and limits with [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) and send a value of that kind.
+- Send `strict: false` to leave values that do not fit out: the render's `form.skipped` lists their fields with the reason `invalid`.
+- For `no_font`, fill without `flatten`: the value is set in the field, and the viewer draws it with its own fonts.
+
+**Retry.**
+
+Not with the same request: the field still does not take that value.
+
+## 422 form_xfa_unsupported
+
+The PDF given to [`/pdf/fill`](https://docs.formfeed.dev/api/pdf-tools#fill) is an XFA form: its fields are described in XML that only a few viewers, Adobe's above all, lay out and fill. Formfeed fills the ordinary forms of PDF (AcroForms), so nothing was filled and nothing was charged. [`/pdf/info`](https://docs.formfeed.dev/api/pdf-tools#info) says `"type": "xfa"` for such a file.
+
+A hybrid form, an AcroForm with an XFA part beside it, is filled: through its AcroForm, its XFA part removed, which the render's `form.xfa_removed` says.
+
+**Causes.**
+
+- A form made with Adobe LiveCycle Designer or AEM Forms as a dynamic form, as some public authorities still publish them.
+
+**Fix.**
+
+- Ask whoever publishes the form for an ordinary PDF form; many publish both.
+- If the form is yours, save it as a static form, or make it again as an ordinary PDF form.
+
+**Retry.**
+
+Not with the same file.
+
 ## 400 invalid_request
 
 The request could not be accepted as it is: the body is not JSON, a field has the wrong type or value, or fields are combined in a way the API does not allow. When the body or the query does not fit the contract, `issues` lists every problem, each with the field (`path`) and what is wrong (`message`). For a combination of fields, `detail` explains it and `field` names the field.
@@ -809,6 +911,37 @@ Only requests that start work count: `POST` to `/v1/renders` and `/v1/renders/ba
 
 Yes, after the number of seconds in `Retry-After`, with the same `Idempotency-Key`. This answer is given before the key is looked at and is not stored, so the retry really runs.
 
+## 422 redaction_incomplete
+
+After [`/pdf/redact`](https://docs.formfeed.dev/api/pdf-tools#redact), Formfeed reads the result again ([what is checked](https://docs.formfeed.dev/api/pdf-tools#redact-check)), and it found something still there that the call was to remove. A redacted file that still holds what it was asked to remove is worse than none, so **no file was delivered** and nothing was charged. The problem says what was left by number and count, never by its text:
+
+| Field          | Present when                                              | Holds                                                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `regions`      | text still lay under a rectangle                          | Per rectangle: its position in your `regions` list (`region`, from 0), its `page`, and how many pieces of text were left (`text_items`).                                                              |
+| `text`         | a named text could still be found on a page               | Per text and page: its position in your `text` list (`text`, from 0), the `page`, how often it was found (`occurrences`), and how many of its characters still stood where it was cut out (`glyphs`). |
+| `places`       | a named text still stands outside the pages               | Where: `metadata`, `outline` (bookmarks), `attachments`, `form` or `annotations`.                                                                                                                     |
+| `copies`       | a copy of removed text survived that could not be cleared | How many copies; `unread` counts the parts of the file that could not be read for the search.                                                                                                         |
+| `revisions`    | the result kept an earlier revision                       | How many revisions the file has; a redacted file has one.                                                                                                                                             |
+| `unread_pages` | text of the result could not be read for the check        | The pages, set in a font that could not be read.                                                                                                                                                      |
+
+**Causes.**
+
+- Text drawn in a way the redaction does not take apart, often from a scanner's or an old program's export.
+- A text that also stands in the document's metadata or an attachment, which the redaction does not change (`places`).
+- A tagged PDF that keeps the removed words as the text that stands for its content, an ActualText, which cannot be cleared on its own (`copies`).
+
+**Fix.**
+
+- With `regions`: open the file in a viewer, check what sits under the rectangle the problem names, and try again with that rectangle a little larger.
+- With `places`: remove the text from the document's title, bookmarks or attachments in the program the file comes from, or make the file again without them, then redact.
+- With `copies`: make the file again without tags, or redact the text in the program it comes from.
+- For a form, flatten it first in the program it comes from, so its values become part of the page, then redact.
+- If it keeps failing, send the `render_id` to support with the file.
+
+**Retry.**
+
+Not with the same file and request: the result would be the same.
+
 ## 503 region_unavailable
 
 The render service of the region could not take the request. Formfeed renders in the EU (`eu`, the default); see [Data residency](https://docs.formfeed.dev/api/data-residency). The answer always carries `Retry-After`. Nothing was rendered or charged.
@@ -1141,6 +1274,24 @@ A source that cannot be read at all answers [`source_invalid`](https://docs.form
 **Retry.**
 
 Once. A temporary failure goes away on a retry with the same `Idempotency-Key` (answers of `500` are not stored under the key); a document that triggers it fails again. Async renders with a `post` step are retried by the queue, and end as [`worker_exhausted`](https://docs.formfeed.dev/errors/worker-exhausted) when every attempt fails.
+
+## 503 tool_unavailable
+
+The service that does the work of [`/pdf/split`](https://docs.formfeed.dev/api/pdf-tools#split), [`/pdf/compress`](https://docs.formfeed.dev/api/pdf-tools#compress) and [`/pdf/to-image`](https://docs.formfeed.dev/api/pdf-tools#to-image) is busy or not reachable right now. Formfeed already tried again within the 60 seconds a tool call has. The answer carries `Retry-After` (5 seconds) and the `render_id` of the failed call, which appears in the render log. Nothing was charged.
+
+**Causes.**
+
+- Many tool calls and office conversions at the same time in your region: the two share a service, so bursts queue up.
+- The service restarting after an update (_The PDF tools are not reachable; retry shortly_).
+
+**Fix.**
+
+- Retry after the number of seconds in the `Retry-After` header, with the same `Idempotency-Key`.
+- Spread large numbers of calls over time.
+
+**Retry.**
+
+Yes, after the seconds in `Retry-After`, with the same `Idempotency-Key`; answers of `503` are not stored under the key.
 
 ## 401 unauthorized
 
