@@ -234,6 +234,10 @@ Render the templates changed since a base ref and write a summary for the pull r
 | `--out <dir>` | directory for the rendered files (default `formfeed-preview`) |
 | `--summary <file>` | markdown summary file (default `formfeed-preview.md`) |
 | `--all` | render every template instead of the changed ones |
+| `--data-sets <which>` | default (each template's default data set), all, or names separated by commas (default `default`) |
+| `--compare` | render the base's version of each data set too, and fail when a page count changed |
+| `--allow-page-changes` | with --compare: report a changed page count without failing |
+| `--max-renders <n>` | stop before making more renders than this, the base's included (default `100`) |
 
 ### `formfeed brand pull`
 

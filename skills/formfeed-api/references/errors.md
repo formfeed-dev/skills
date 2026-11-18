@@ -990,6 +990,7 @@ A step of the render took longer than its limit. There is no limit on the render
 | The template language (Jinja2, Liquid, Handlebars) fills the template with the data                                                              | 5 seconds                                             | _Template render took 6120 ms; the limit is 5000 ms_                                                                                             |
 | Chromium loads the document, until none of its requests is running ([`waitFor.networkIdle`](https://docs.formfeed.dev/templates/settings#waiting-for-content) says how) | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
 | Waiting until an element matching [`waitFor.selector`](https://docs.formfeed.dev/templates/settings#waiting-for-content) is visible                                     | `waitFor.timeoutMs`, 5 seconds by default, at most 30 | _Render exceeded 30000 ms_ (the message names 30 seconds in any case)                                                                            |
+| Waiting until [`waitFor.function`](https://docs.formfeed.dev/templates/settings#wait-for-function) is truthy                                                            | the same `waitFor.timeoutMs`, after the selector      | _waitFor.function did not return a truthy value within 5000 ms; its last evaluation threw TypeError: …_                                          |
 | Taking the picture of an image output, or of the element of `image.clipSelector`                                                                 | 30 seconds                                            | _Render exceeded 30000 ms_                                                                                                                       |
 | Printing the PDF                                                                                                                                 | 120 seconds                                           | _Printing the PDF exceeded 120000 ms_                                                                                                            |
 | Filling a Word or PowerPoint template                                                                                                            | 10 seconds                                            | _Template render took … ms; the limit is 10000 ms_                                                                                               |
@@ -1008,12 +1009,13 @@ The render is recorded as failed and costs nothing. [How long a render may take]
 - Images, fonts or scripts from a slow server: the document counts as loaded only when none of its requests is running.
 - A script that keeps the network busy, such as polling or an analytics beacon.
 - A `waitFor.selector` that never becomes visible, because the script that adds the element failed, the selector does not match, or the element stays hidden.
+- A `waitFor.function` that never becomes true, because the script sets its flag under another name or fails first. The detail quotes the last error the condition threw.
 - A Word or PowerPoint file with many large pictures or pages, which LibreOffice converts slowly.
 
 **Fix.**
 
 - Reduce the work in the template: compute totals and groupings in your application and send the results.
-- Host images and fonts on a fast CDN, or in the [file library](https://docs.formfeed.dev/api/files), and check that `waitFor.selector` matches an element your script really adds.
+- Host images and fonts on a fast CDN, or in the [file library](https://docs.formfeed.dev/api/files), and check that `waitFor.selector` matches an element your script really adds, or that your script really sets what `waitFor.function` asks for.
 - Set `waitFor.networkIdle` to `false` for documents that keep a connection open.
 - For office documents, compress the pictures, or split the document.
 
