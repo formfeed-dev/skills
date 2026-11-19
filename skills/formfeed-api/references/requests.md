@@ -67,25 +67,16 @@ print(render.status, render.download_url)
 
 ```php
 <?php
-$body = [
+require __DIR__ . '/vendor/autoload.php';
+
+$formfeed = new Formfeed\Client(apiKey: getenv('FORMFEED_API_KEY'));
+
+$render = $formfeed->renders->create([
     'template' => 'invoice',
     'data' => json_decode(file_get_contents('data.json'), true),
     'filename' => 'invoice-2026-0042.pdf',
-];
-
-$curl = curl_init('https://api-eu.formfeed.dev/v1/renders');
-curl_setopt_array($curl, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-        'Authorization: Bearer ' . getenv('FORMFEED_API_KEY'),
-        'Content-Type: application/json',
-    ],
-    CURLOPT_POSTFIELDS => json_encode($body),
 ]);
-$render = json_decode(curl_exec($curl), true);
-
-echo $render['status'], ' ', $render['download_url'], PHP_EOL;
+echo $render->status, ' ', $render->downloadUrl, PHP_EOL;
 ```
 
 ## Go
