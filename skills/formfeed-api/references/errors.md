@@ -551,6 +551,41 @@ Your own earlier session does not count: a new session of the same key or signed
 
 Once a session has ended, the same request succeeds. If you call `POST /webhooks/listen` yourself with an `Idempotency-Key`, use a new one: a `4xx` answer is stored under its key for 24 hours.
 
+## 422 markdown_syntax_error
+
+A [Markdown document](https://docs.formfeed.dev/api/markdown) holds a formula that KaTeX cannot typeset (with `settings.markdown.math`) or a diagram that Mermaid cannot draw (with `settings.markdown.diagrams`), or more of them than a document may hold, so nothing was rendered. A PDF is sent to someone, so the render fails instead of printing an error box into the page. The render is recorded as failed and costs nothing.
+
+`location.line` names the line, counted from the top of the text you sent, front matter included; with an `engine`, it is the line of the text the template rendered. `part` says what could not be read: `math`, a formula, or `diagram`, a diagram. `detail` gives KaTeX's or Mermaid's own message.
+
+**Causes.**
+
+In a formula:
+
+- **A brace, an argument or an environment that is not closed:** `\frac{1}` without its second argument, `\left(` without `\right)`, `\begin{aligned}` without `\end{aligned}`.
+- **A command KaTeX does not know**, such as `\frak` for `\mathfrak` or a macro of your own LaTeX preamble. Define it in the document with `\gdef`, which holds for every formula after it.
+- **A `$$` that is never closed:** a line that starts with `$$` opens a formula, and only a line that ends in `$$` closes it.
+- **A `&` outside an environment** that aligns, such as `aligned` or `cases`.
+- **A command that would link, load a picture or write HTML:** `\href`, `\url`, `\includegraphics`, `\htmlClass`, `\htmlId`, `\htmlStyle` and `\htmlData` are refused.
+- **Money read as a formula:** with `math` on, `between $5 and 10$ a month` holds a formula, because the second `$` follows a digit and stands before a space. Write `\$` for a dollar sign.
+
+In a diagram:
+
+- **A line Mermaid's grammar does not take**, such as an arrow without its end (`A -->`) or `-->>` in a flowchart, which only a sequence diagram takes.
+- **A first line that names no kind of diagram** Mermaid knows: it starts with `flowchart`, `sequenceDiagram`, `pie` and the like.
+- **More than 500 edges**, Mermaid's own limit.
+
+And the limits: a formula over 4 kB of TeX, more than 1,000 formulas or more than 256 kB of TeX together, a diagram over 50 kB, or more than 50 diagrams.
+
+**Fix.**
+
+- Go to `location.line` and correct the formula or diagram there, or write a dollar sign that is meant as money as `\$`.
+- Check a formula against [what KaTeX supports](https://katex.org/docs/supported.html), and a diagram against [Mermaid's syntax](https://mermaid.js.org/intro/syntax-reference.html); Mermaid's live editor shows the same message.
+- A document that holds money and no formulas does not need `math`, nor one without diagrams `diagrams`: both are off by default.
+
+**Retry.**
+
+No. The same request gets the same answer. Correct the text and send it again with a new `Idempotency-Key` or without one: a `4xx` answer is stored under its key for 24 hours, so the old key returns this problem again. See [retrying](https://docs.formfeed.dev/api/errors#retries).
+
 ## 422 navigation_failed
 
 A `url` render could not load the page it names. The render is recorded as failed and costs nothing. `detail` carries the reason, often the browser's own message.

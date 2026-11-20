@@ -299,6 +299,9 @@ Convert a Word, Excel, PowerPoint, OpenDocument, RTF or HTML file to PDF (Starte
 | `--css <file>` | Markdown: a stylesheet after the theme |
 | `--settings <file>` | Markdown: a JSON file of render settings, which the other options go over |
 | `--raw-html` | Markdown: write raw HTML in the text as it stands instead of showing it as text |
+| `--no-highlight` | Markdown: print code in the text's colour instead of colouring the fences that name a language |
+| `--math` | Markdown: typeset formulas ($…$, $$…$$ and math fences) with KaTeX; a $ is text without it |
+| `--diagrams` | Markdown: draw mermaid fences as diagrams; they print as code without it |
 | `--no-download` | create the PDF render without downloading it |
 
 ### `formfeed pdf split <source>`
