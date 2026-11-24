@@ -87,39 +87,35 @@ echo $render->status, ' ', $render->downloadUrl, PHP_EOL;
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"log"
 	"os"
+
+	formfeed "github.com/formfeed-dev/formfeed-go"
 )
 
 func main() {
-	data, err := os.ReadFile("data.json")
+	client := formfeed.NewClient(os.Getenv("FORMFEED_API_KEY"))
+
+	contents, err := os.ReadFile("data.json")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	body, _ := json.Marshal(map[string]any{
-		"template": "invoice",
-		"data":     json.RawMessage(data),
-		"filename": "invoice-2026-0042.pdf",
+	var data map[string]any
+	if err := json.Unmarshal(contents, &data); err != nil {
+		log.Fatal(err)
+	}
+
+	render, err := client.Renders.Create(context.Background(), formfeed.RenderRequest{
+		Template: "invoice",
+		Data:     data,
+		Filename: "invoice-2026-0042.pdf",
 	})
-
-	request, _ := http.NewRequest("POST", "https://api-eu.formfeed.dev/v1/renders", bytes.NewReader(body))
-	request.Header.Set("Authorization", "Bearer "+os.Getenv("FORMFEED_API_KEY"))
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	defer response.Body.Close()
-
-	var render struct {
-		Status      string `json:"status"`
-		DownloadURL string `json:"download_url"`
-	}
-	json.NewDecoder(response.Body).Decode(&render)
 	fmt.Println(render.Status, render.DownloadURL)
 }
 ```
