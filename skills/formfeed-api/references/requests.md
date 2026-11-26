@@ -187,21 +187,14 @@ public class Render {
 
 ```ruby
 require "json"
-require "net/http"
+require "formfeed"
 
-body = {
+formfeed = Formfeed::Client.new(api_key: ENV.fetch("FORMFEED_API_KEY"))
+
+render = formfeed.renders.create(
   template: "invoice",
   data: JSON.parse(File.read("data.json")),
-  filename: "invoice-2026-0042.pdf",
-}
-
-response = Net::HTTP.post(
-  URI("https://api-eu.formfeed.dev/v1/renders"),
-  JSON.generate(body),
-  "Authorization" => "Bearer #{ENV.fetch("FORMFEED_API_KEY")}",
-  "Content-Type" => "application/json"
+  filename: "invoice-2026-0042.pdf"
 )
-render = JSON.parse(response.body)
-
-puts render["status"], render["download_url"]
+puts "#{render.status} #{render.download_url}"
 ```
